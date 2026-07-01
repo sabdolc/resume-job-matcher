@@ -8,17 +8,38 @@ export class UnsupportedFileTypeError extends Error {
 }
 
 async function extractPdfText(buffer: Buffer): Promise<string> {
-  // Use the CJS bundle directly to avoid dynamic import bundling issues
-  // in serverless environments (Netlify Functions, Vercel, etc.)
+  // pdf2json is pure JS with no native Node dependencies — reliable in serverless.
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { PDFParse } = require("pdf-parse");
-  const parser = new PDFParse({ data: buffer });
-  try {
-    const result = await parser.getText();
-    return result.text.trim();
-  } finally {
-    await parser.destroy();
-  }
+  const PDFParser = require("pdf2json");
+
+  return new Promise((resolve, reject) => {
+    const parser = new PDFParser(null, 1);
+
+    parser.on("pdfParser_dataReady", (data: {
+      Pages: Array<{ Texts: Array<{ R: Array<{ T: string }> }> }>
+    }) => {
+      const text = data.Pages
+        .flatMap((page) => page.Texts)
+        .map((t) => {
+          try {
+            return decodeURIComponent(t.R.map((r) => r.T).join(""));
+          } catch {
+            return t.R.map((r) => r.T).join("");
+          }
+        })
+        .join(" ")
+        .replace(/\s+/g, " ")
+        .trim();
+
+      resolve(text);
+    });
+
+    parser.on("pdfParser_dataError", (err: Error) => {
+      reject(new Error(`PDF parsing failed: ${err.message}`));
+    });
+
+    parser.parseBuffer(buffer);
+  });
 }
 
 /**
