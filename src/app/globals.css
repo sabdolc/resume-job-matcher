@@ -1,0 +1,63 @@
+@import "tailwindcss";
+
+:root {
+  --paper: #faf9f6;
+  --paper-raised: #ffffff;
+  --ink: #1c1e26;
+  --ink-soft: #5b5e6b;
+  --line: #e4e1d8;
+  --cobalt: #3454d1;
+  --cobalt-soft: #eaeefb;
+  --success: #2a9d6f;
+  --success-soft: #e7f4ee;
+  --warning: #c77d26;
+  --warning-soft: #faf0e3;
+  --danger: #c4493a;
+  --danger-soft: #fbeae7;
+
+  --font-display: "Space Grotesk", ui-sans-serif, sans-serif;
+  --font-body: "Inter", ui-sans-serif, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-paper-raised: var(--paper-raised);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-line: var(--line);
+  --color-cobalt: var(--cobalt);
+  --color-cobalt-soft: var(--cobalt-soft);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --font-display: var(--font-display);
+  --font-body: var(--font-body);
+  --font-mono: var(--font-mono);
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+* {
+  scrollbar-color: var(--ink-soft) transparent;
+}
+
+::selection {
+  background: var(--cobalt-soft);
+  color: var(--cobalt);
+}
