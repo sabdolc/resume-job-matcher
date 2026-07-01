@@ -1,7 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import type { AnalysisResult } from "./types";
 
-const MODEL = "gemini-1.5-flash";
+const MODEL = "gemini-3.5-flash";
 
 function getClient() {
   const apiKey = process.env.GEMINI_API_KEY;
