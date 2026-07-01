@@ -1,16 +1,16 @@
-import Anthropic from "@anthropic-ai/sdk";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import type { AnalysisResult } from "./types";
 
-const MODEL = "claude-sonnet-4-6";
+const MODEL = "gemini-1.5-flash";
 
-function getClient(): Anthropic {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+function getClient() {
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error(
-      "ANTHROPIC_API_KEY is not set. Add it to your .env.local file."
+      "GEMINI_API_KEY is not set. Add it to your .env.local file."
     );
   }
-  return new Anthropic({ apiKey });
+  return new GoogleGenerativeAI(apiKey);
 }
 
 const SYSTEM_PROMPT = `You are an expert technical recruiter and resume coach with 15 years of experience screening candidates for tech roles. You give direct, specific, actionable feedback — never vague platitudes.
@@ -37,22 +37,23 @@ The JSON must match this exact shape:
     {
       "section": "<which resume section/bullet this refers to, e.g. 'Experience — Acme Corp, Backend Engineer'>",
       "original": "<the original line or a close paraphrase of it>",
-      "rewritten": "<an improved version tailored to this job description, using stronger/more relevant language and keywords from the JD where honestly applicable>",
+      "rewritten": "<an improved version tailored to this job description>",
       "reason": "<one sentence on why this rewrite is stronger for this specific JD>"
     }
   ]
 }
 
 Guidelines:
-- Be honest and calibrated with matchScore. Most real candidates score 40-85%. Reserve 90+ for near-perfect matches and below 30 for poor fits. Do not inflate the score to be nice.
-- Base matchedSkills and missingSkills on the ACTUAL requirements stated in the job description, prioritizing must-have/required qualifications over nice-to-haves.
+- Be honest and calibrated with matchScore. Most real candidates score 40-85%. Reserve 90+ for near-perfect matches and below 30 for poor fits.
 - List 4-8 matchedSkills and 3-7 missingSkills, ordered by importance.
-- Provide 3-5 rewriteSuggestions, focused on the highest-impact changes — bullets that are vague, missing keywords, or could better quantify impact.
-- Never fabricate experience the candidate doesn't have. Rewrites should reframe and sharpen real experience, not invent new experience.
+- Provide 3-5 rewriteSuggestions focused on the highest-impact changes.
+- Never fabricate experience the candidate doesn't have.
 - Output ONLY the JSON object, nothing else.`;
 
-function buildUserPrompt(resumeText: string, jobDescription: string): string {
-  return `JOB DESCRIPTION:
+function buildPrompt(resumeText: string, jobDescription: string): string {
+  return `${SYSTEM_PROMPT}
+
+JOB DESCRIPTION:
 """
 ${jobDescription}
 """
@@ -67,7 +68,6 @@ Analyze the match and respond with the JSON object as specified.`;
 
 function extractJson(raw: string): string {
   let text = raw.trim();
-  // Strip markdown code fences if the model added them despite instructions.
   if (text.startsWith("```")) {
     text = text.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "");
   }
@@ -79,30 +79,15 @@ function validateResult(parsed: unknown): AnalysisResult {
     throw new Error("Analysis response was not a JSON object.");
   }
   const obj = parsed as Record<string, unknown>;
-
-  if (typeof obj.matchScore !== "number") {
-    throw new Error("Analysis response is missing a numeric matchScore.");
-  }
-  if (typeof obj.verdict !== "string") {
-    throw new Error("Analysis response is missing a verdict.");
-  }
-  if (typeof obj.summary !== "string") {
-    throw new Error("Analysis response is missing a summary.");
-  }
-  if (!Array.isArray(obj.matchedSkills)) {
-    throw new Error("Analysis response is missing matchedSkills.");
-  }
-  if (!Array.isArray(obj.missingSkills)) {
-    throw new Error("Analysis response is missing missingSkills.");
-  }
-  if (!Array.isArray(obj.rewriteSuggestions)) {
-    throw new Error("Analysis response is missing rewriteSuggestions.");
-  }
-
-  const clampedScore = Math.max(0, Math.min(100, Math.round(obj.matchScore as number)));
+  if (typeof obj.matchScore !== "number") throw new Error("Missing matchScore.");
+  if (typeof obj.verdict !== "string") throw new Error("Missing verdict.");
+  if (typeof obj.summary !== "string") throw new Error("Missing summary.");
+  if (!Array.isArray(obj.matchedSkills)) throw new Error("Missing matchedSkills.");
+  if (!Array.isArray(obj.missingSkills)) throw new Error("Missing missingSkills.");
+  if (!Array.isArray(obj.rewriteSuggestions)) throw new Error("Missing rewriteSuggestions.");
 
   return {
-    matchScore: clampedScore,
+    matchScore: Math.max(0, Math.min(100, Math.round(obj.matchScore as number))),
     verdict: obj.verdict as string,
     summary: obj.summary as string,
     matchedSkills: obj.matchedSkills as AnalysisResult["matchedSkills"],
@@ -115,26 +100,12 @@ export async function analyzeResumeMatch(
   resumeText: string,
   jobDescription: string
 ): Promise<AnalysisResult> {
-  const client = getClient();
+  const genAI = getClient();
+  const model = genAI.getGenerativeModel({ model: MODEL });
 
-  const message = await client.messages.create({
-    model: MODEL,
-    max_tokens: 4000,
-    system: SYSTEM_PROMPT,
-    messages: [
-      {
-        role: "user",
-        content: buildUserPrompt(resumeText, jobDescription),
-      },
-    ],
-  });
-
-  const textBlock = message.content.find((block) => block.type === "text");
-  if (!textBlock || textBlock.type !== "text") {
-    throw new Error("No text response received from the analysis model.");
-  }
-
-  const jsonString = extractJson(textBlock.text);
+  const result = await model.generateContent(buildPrompt(resumeText, jobDescription));
+  const raw = result.response.text();
+  const jsonString = extractJson(raw);
 
   let parsed: unknown;
   try {

@@ -72,8 +72,8 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     console.error("Analysis failed:", err);
     const message =
-      err instanceof Error && err.message.includes("ANTHROPIC_API_KEY")
-        ? "Server is missing an API key. Add ANTHROPIC_API_KEY to your environment."
+      err instanceof Error && err.message.includes("GEMINI_API_KEY")
+        ? "Server is missing an API key. Add GEMINI_API_KEY to your environment."
         : "Something went wrong while analyzing your resume. Please try again.";
     return errorResponse(message, 500);
   }
