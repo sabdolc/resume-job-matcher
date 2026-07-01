@@ -7,6 +7,20 @@ export class UnsupportedFileTypeError extends Error {
   }
 }
 
+async function extractPdfText(buffer: Buffer): Promise<string> {
+  // Use the CJS bundle directly to avoid dynamic import bundling issues
+  // in serverless environments (Netlify Functions, Vercel, etc.)
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { PDFParse } = require("pdf-parse");
+  const parser = new PDFParse({ data: buffer });
+  try {
+    const result = await parser.getText();
+    return result.text.trim();
+  } finally {
+    await parser.destroy();
+  }
+}
+
 /**
  * Extracts plain text from an uploaded resume file (PDF or DOCX).
  */
@@ -24,15 +38,7 @@ export async function extractTextFromFile(
     lowerName.endsWith(".docx");
 
   if (isPdf) {
-    // pdf-parse v2 API: PDFParse class, data accepts Buffer/Uint8Array directly.
-    const { PDFParse } = await import("pdf-parse");
-    const parser = new PDFParse({ data: buffer });
-    try {
-      const result = await parser.getText();
-      return result.text.trim();
-    } finally {
-      await parser.destroy();
-    }
+    return extractPdfText(buffer);
   }
 
   if (isDocx) {
