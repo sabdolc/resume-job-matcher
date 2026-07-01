@@ -4,7 +4,6 @@ import { analyzeResumeMatch } from "@/lib/claude";
 import type { AnalyzeErrorResponse } from "@/lib/types";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
 
 const MAX_FILE_SIZE_BYTES = 8 * 1024 * 1024; // 8MB
 const MIN_JD_LENGTH = 30;
@@ -67,8 +66,8 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await analyzeResumeMatch(resumeText, jobDescription.trim());
-
     return NextResponse.json(result);
+
   } catch (err) {
     console.error("Analysis failed:", err);
     const message =
